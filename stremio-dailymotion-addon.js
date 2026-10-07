@@ -46,68 +46,31 @@ async function searchDailymotion(q, limit = 25, page = 1) {
   return body;
 }
 
-builder.defineCatalogHandler(async ({ type, id, extra }) => {
+builder.defineStreamHandler(async ({ type, id }) => {
+  console.log(`STREAM REQUEST: type=${type}, id=${id}`);
+
   try {
-    const searchQuery = extra && extra.search
-      ? String(extra.search).trim()
-      : '';
+    const vid = id.replace(/^dm:/, '');
 
-    console.log(
-      `Catalog request: type=${type}, id=${id}, search="${searchQuery}"`
-    );
+    console.log(`Dailymotion video ID: ${vid}`);
 
-    let dm;
+    const embedUrl = `https://www.dailymotion.com/embed/video/${vid}`;
 
-    if (searchQuery) {
-      console.log(`Searching Dailymotion for: ${searchQuery}`);
+    console.log(`Returning stream URL: ${embedUrl}`);
 
-      dm = await searchDailymotion(searchQuery, 25);
-    } else {
-      console.log('Loading default Dailymotion catalogue');
-
-      const fields = [
-        'id',
-        'title',
-        'duration',
-        'thumbnail_url',
-        'description'
-      ].join(',');
-
-      const params = new URLSearchParams({
-        fields,
-        limit: '25',
-        sort: 'recent'
-      });
-
-      const res = await fetch(
-        `https://api.dailymotion.com/videos?${params.toString()}`
-      );
-
-      if (!res.ok) {
-        throw new Error(`Dailymotion API error: ${res.status}`);
-      }
-
-      dm = await res.json();
-    }
-
-    console.log(
-      `Dailymotion returned ${dm.list?.length || 0} videos`
-    );
-
-    const metas = (dm.list || []).map(v => ({
-      id: `dm:${v.id}`,
-      type: type || 'movie',
-      name: v.title,
-      poster: v.thumbnail_url || undefined,
-      description: v.description || undefined,
-      runtime: v.duration || undefined
-    }));
-
-    return { metas };
+    return {
+      streams: [
+        {
+          title: 'Dailymotion',
+          url: embedUrl,
+          isFree: true
+        }
+      ]
+    };
 
   } catch (err) {
-    console.error('Catalog error:', err);
-    return { metas: [] };
+    console.error('STREAM ERROR:', err);
+    return { streams: [] };
   }
 });
 
