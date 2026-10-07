@@ -1,9 +1,8 @@
 // stremio-dailymotion-addon.js
 // Simple Stremio add-on that exposes Dailymotion public videos using Dailymotion's Platform API
 
-const { addonBuilder } = require('stremio-addon-sdk');
+const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
 const fetch = require('node-fetch');
-const http = require('http');
 
 const manifest = {
   id: 'org.gabriel.dailymotion',
@@ -91,8 +90,6 @@ builder.defineStreamHandler(async ({ id }) => {
   }
 });
 
-const addonInterface = builder.getInterface();
 const port = process.env.PORT || 7000;
 
-const server = http.createServer((req, res) => addonInterface(req, res));
-server.listen(port, () => console.log(`Stremio Dailymotion addon running on http://localhost:${port}/manifest.json`));
+serveHTTP(builder.getInterface(), { port });
