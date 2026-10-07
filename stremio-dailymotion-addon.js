@@ -14,16 +14,16 @@ const manifest = {
   idPrefixes: ['dm:'],
 catalogs: [
   {
-    type: 'series',
-    id: 'dailymotion_series',
-    name: 'Dailymotion — Series/Shows',
-    extra: [{ name: 'search', isRequired: true }]
-  },
-  {
     type: 'movie',
     id: 'dailymotion_movies',
     name: 'Dailymotion — Movies',
-    extra: [{ name: 'search', isRequired: true }]
+    extra: [{ name: 'search', isRequired: false }]
+  },
+  {
+    type: 'series',
+    id: 'dailymotion_series',
+    name: 'Dailymotion — Series/Shows',
+    extra: [{ name: 'search', isRequired: false }]
   }
 ],
   contactEmail: 'you@example.com',
@@ -48,9 +48,57 @@ async function searchDailymotion(q, limit = 25, page = 1) {
 
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
   try {
-   const searchQuery = (extra && extra.search) || '';
-    if (!searchQuery) return { metas: [] };
-    const dm = await searchDailymotion(searchQuery, 25);
+    const searchQuery = (extra && extra.search) || '';
+
+    let dm;
+
+    if (searchQuery) {
+      // Search Dailymotion when the user searches in Stremio
+      dm = await searchDailymotion(searchQuery, 25);
+    } else {
+      // Show recent/trending public Dailymotion videos in the catalogue
+      const fields = [
+        'id',
+        'title',
+        'duration',
+        'thumbnail_url',
+        'url',
+        'description'
+      ].join(',');
+
+      const params = new URLSearchParams({
+        fields,
+        limit: '25',
+        sort: 'recent'
+      });
+
+      const res = await fetch(
+        `https://api.dailymotion.com/videos?${params.toString()}`
+      );
+
+      if (!res.ok) {
+        throw new Error(`Dailymotion API error: ${res.status}`);
+      }
+
+      dm = await res.json();
+    }
+
+    const metas = (dm.list || []).map(v => ({
+      id: `dm:${v.id}`,
+      type: type || 'movie',
+      name: v.title,
+      poster: v.thumbnail_url || undefined,
+      description: v.description || undefined,
+      runtime: v.duration || undefined
+    }));
+
+    return { metas };
+
+  } catch (err) {
+    console.error('Catalog error', err);
+    return { metas: [] };
+  }
+});
     const metas = (dm.list || []).map(v => ({
       id: `dm:${v.id}`,
       type: type || 'movie',
