@@ -74,6 +74,12 @@ builder.defineStreamHandler(async ({ type, id }) => {
   }
 });
 
+  } catch (err) {
+    console.error('STREAM ERROR:', err);
+    return { streams: [] };
+  }
+});
+
 builder.defineMetaHandler(async ({ type, id }) => {
   try {
     const vid = id.replace(/^dm:/, '');
@@ -96,16 +102,6 @@ builder.defineMetaHandler(async ({ type, id }) => {
   }
 });
 
-builder.defineStreamHandler(async ({ id }) => {
-  try {
-    const vid = id.replace(/^dm:/, '');
-    const embedUrl = `https://www.dailymotion.com/embed/video/${vid}`;
-    return { streams: [{ title: 'Dailymotion (embed)', url: embedUrl, isFree: true }] };
-  } catch (err) {
-    console.error('Stream error', err);
-    return { streams: [] };
-  }
-});
 
 const port = process.env.PORT || 7000;
 
