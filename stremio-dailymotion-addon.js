@@ -48,15 +48,23 @@ async function searchDailymotion(q, limit = 25, page = 1) {
 
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
   try {
-    const searchQuery = (extra && extra.search) || '';
+    const searchQuery = extra && extra.search
+      ? String(extra.search).trim()
+      : '';
+
+    console.log(
+      `Catalog request: type=${type}, id=${id}, search="${searchQuery}"`
+    );
 
     let dm;
 
     if (searchQuery) {
-      // Search Dailymotion
+      console.log(`Searching Dailymotion for: ${searchQuery}`);
+
       dm = await searchDailymotion(searchQuery, 25);
     } else {
-      // Get recent Dailymotion videos for the normal catalogue
+      console.log('Loading default Dailymotion catalogue');
+
       const fields = [
         'id',
         'title',
@@ -66,7 +74,7 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
       ].join(',');
 
       const params = new URLSearchParams({
-        fields: fields,
+        fields,
         limit: '25',
         sort: 'recent'
       });
@@ -82,6 +90,10 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
       dm = await res.json();
     }
 
+    console.log(
+      `Dailymotion returned ${dm.list?.length || 0} videos`
+    );
+
     const metas = (dm.list || []).map(v => ({
       id: `dm:${v.id}`,
       type: type || 'movie',
@@ -94,7 +106,7 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
     return { metas };
 
   } catch (err) {
-    console.error('Catalog error', err);
+    console.error('Catalog error:', err);
     return { metas: [] };
   }
 });
