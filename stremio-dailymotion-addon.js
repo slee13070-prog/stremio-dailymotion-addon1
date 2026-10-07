@@ -12,10 +12,20 @@ const manifest = {
   resources: ['catalog', 'stream', 'meta'],
   types: ['movie', 'series', 'episode'],
   idPrefixes: ['dm:'],
-  catalogs: [
-    { type: 'series', id: 'dailymotion_series', name: 'Dailymotion — Series/Shows (search)' },
-    { type: 'movie', id: 'dailymotion_movies', name: 'Dailymotion — Movies (search)' }
-  ],
+catalogs: [
+  {
+    type: 'series',
+    id: 'dailymotion_series',
+    name: 'Dailymotion — Series/Shows',
+    extra: [{ name: 'search', isRequired: true }]
+  },
+  {
+    type: 'movie',
+    id: 'dailymotion_movies',
+    name: 'Dailymotion — Movies',
+    extra: [{ name: 'search', isRequired: true }]
+  }
+],
   contactEmail: 'you@example.com',
   links: { homepage: 'https://github.com' }
 };
@@ -38,7 +48,7 @@ async function searchDailymotion(q, limit = 25, page = 1) {
 
 builder.defineCatalogHandler(async ({ type, id, extra }) => {
   try {
-    const searchQuery = (extra && extra.search && extra.search.query) || (extra && extra.query) || '';
+   const searchQuery = (extra && extra.search) || '';
     if (!searchQuery) return { metas: [] };
     const dm = await searchDailymotion(searchQuery, 25);
     const metas = (dm.list || []).map(v => ({
