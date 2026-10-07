@@ -53,21 +53,20 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
     let dm;
 
     if (searchQuery) {
-      // Search Dailymotion when the user searches in Stremio
+      // Search Dailymotion
       dm = await searchDailymotion(searchQuery, 25);
     } else {
-      // Show recent/trending public Dailymotion videos in the catalogue
+      // Get recent Dailymotion videos for the normal catalogue
       const fields = [
         'id',
         'title',
         'duration',
         'thumbnail_url',
-        'url',
         'description'
       ].join(',');
 
       const params = new URLSearchParams({
-        fields,
+        fields: fields,
         limit: '25',
         sort: 'recent'
       });
@@ -94,21 +93,6 @@ builder.defineCatalogHandler(async ({ type, id, extra }) => {
 
     return { metas };
 
-  } catch (err) {
-    console.error('Catalog error', err);
-    return { metas: [] };
-  }
-});
-    const metas = (dm.list || []).map(v => ({
-      id: `dm:${v.id}`,
-      type: type || 'movie',
-      name: v.title,
-      poster: v.thumbnail_url || undefined,
-      description: v.description || undefined,
-      runtime: v.duration || undefined,
-      imdb_id: null
-    }));
-    return { metas };
   } catch (err) {
     console.error('Catalog error', err);
     return { metas: [] };
