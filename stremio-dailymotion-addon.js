@@ -12,39 +12,173 @@ const manifest = {
   resources: ['catalog', 'stream', 'meta'],
   types: ['movie', 'series', 'episode'],
   idPrefixes: ['dm:'],
-catalogs: [
-  {
-    type: 'movie',
-    id: 'dailymotion_movies',
-    name: 'Dailymotion — Movies',
-    extra: [{ name: 'search', isRequired: false }]
-  },
-  {
-    type: 'series',
-    id: 'dailymotion_series',
-    name: 'Dailymotion — Series/Shows',
-    extra: [{ name: 'search', isRequired: false }]
-  }
-],
+
+  catalogs: [
+    {
+      type: 'movie',
+      id: 'dailymotion_movies',
+      name: 'Dailymotion — Movies',
+      extra: [{ name: 'search', isRequired: false }]
+    },
+    {
+      type: 'series',
+      id: 'dailymotion_series',
+      name: 'Dailymotion — Series/Shows',
+      extra: [{ name: 'search', isRequired: false }]
+    }
+  ],
+
   contactEmail: 'you@example.com',
   links: { homepage: 'https://github.com' }
 };
 
 const builder = new addonBuilder(manifest);
 
+
+// ===============================
+// DAILYMOTION SEARCH
+// ===============================
+
 async function searchDailymotion(q, limit = 25, page = 1) {
-  const fields = ['id', 'title', 'duration', 'thumbnail_url', 'url', 'description'].join(',');
+  const fields = [
+    'id',
+    'title',
+    'duration',
+    'thumbnail_url',
+    'url',
+    'description'
+  ].join(',');
+
   const params = new URLSearchParams({
     search: q,
     fields,
     limit: String(limit),
     page: String(page)
   });
-  const res = await fetch(`https://api.dailymotion.com/videos?${params.toString()}`);
-  if (!res.ok) throw new Error(`Dailymotion API error: ${res.status}`);
-  const body = await res.json();
-  return body;
+
+  const res = await fetch(
+    `https://api.dailymotion.com/videos?${params.toString()}`
+  );
+
+  if (!res.ok) {
+    throw new Error(`Dailymotion API error: ${res.status}`);
+  }
+
+  return await res.json();
 }
+
+
+// ===============================
+// CATALOG HANDLER
+// ===============================
+
+builder.defineCatalogHandler(async ({ type, id, extra }) => {
+  try {
+    const searchQuery =
+      (extra && extra.search) ||
+      (extra && extra.query) ||
+      '';
+
+    console.log(
+      `Catalog request: type=${type}, id=${id}, search="${searchQuery}"`
+    );
+
+    let dm;
+
+    if (searchQuery) {
+      console.log(`Searching Dailymotion for: ${searchQuery}`);
+
+      dm = await searchDailymotion(searchQuery, 25);
+    } else {
+      console.log('Loading default Dailymotion catalogue');
+
+      const fields = [
+        'id',
+        'title',
+        'duration',
+        'thumbnail_url',
+        'url',
+        'description'
+      ].join(',');
+
+      const params = new URLSearchParams({
+        fields,
+        limit: '25',
+        sort: 'recent'
+      });
+
+      const res = await fetch(
+        `https://api.dailymotion.com/videos?${params.toString()}`
+      );
+
+      if (!res.ok) {
+        throw new Error(`Dailymotion API error: ${res.status}`);
+      }
+
+      dm = await res.json();
+    }
+
+    console.log(
+      `Dailymotion returned ${dm.list?.length || 0} videos`
+    );
+
+    const metas = (dm.list || []).map(v => ({
+      id: `dm:${v.id}`,
+      type: type || 'movie',
+      name: v.title,
+      poster: v.thumbnail_url || undefined,
+      description: v.description || undefined,
+      runtime: v.duration || undefined
+    }));
+
+    return { metas };
+
+  } catch (err) {
+    console.error('Catalog error:', err);
+    return { metas: [] };
+  }
+});
+
+
+// ===============================
+// META HANDLER
+// ===============================
+
+builder.defineMetaHandler(async ({ type, id }) => {
+  try {
+    const vid = id.replace(/^dm:/, '');
+
+    const res = await fetch(
+      `https://api.dailymotion.com/video/${vid}?fields=id,title,duration,thumbnail_url,description,url`
+    );
+
+    if (!res.ok) {
+      return { meta: {} };
+    }
+
+    const v = await res.json();
+
+    return {
+      meta: {
+        id: `dm:${v.id}`,
+        type: type || 'movie',
+        name: v.title,
+        poster: v.thumbnail_url,
+        description: v.description,
+        runtime: v.duration
+      }
+    };
+
+  } catch (err) {
+    console.error('Meta error:', err);
+    return { meta: {} };
+  }
+});
+
+
+// ===============================
+// STREAM HANDLER
+// ===============================
 
 builder.defineStreamHandler(async ({ type, id }) => {
   console.log(`STREAM REQUEST: type=${type}, id=${id}`);
@@ -54,7 +188,8 @@ builder.defineStreamHandler(async ({ type, id }) => {
 
     console.log(`Dailymotion video ID: ${vid}`);
 
-    const embedUrl = `https://www.dailymotion.com/embed/video/${vid}`;
+    const embedUrl =
+      `https://www.dailymotion.com/embed/video/${vid}`;
 
     console.log(`Returning stream URL: ${embedUrl}`);
 
@@ -74,34 +209,10 @@ builder.defineStreamHandler(async ({ type, id }) => {
   }
 });
 
-  } catch (err) {
-    console.error('STREAM ERROR:', err);
-    return { streams: [] };
-  }
-});
 
-builder.defineMetaHandler(async ({ type, id }) => {
-  try {
-    const vid = id.replace(/^dm:/, '');
-    const res = await fetch(`https://api.dailymotion.com/video/${vid}?fields=id,title,duration,thumbnail_url,description,url`);
-    if (!res.ok) return { meta: {} };
-    const v = await res.json();
-    return {
-      meta: {
-        id: `dm:${v.id}`,
-        type: type || 'movie',
-        name: v.title,
-        poster: v.thumbnail_url,
-        description: v.description,
-        runtime: v.duration
-      }
-    };
-  } catch (err) {
-    console.error('Meta error', err);
-    return { meta: {} };
-  }
-});
-
+// ===============================
+// START SERVER
+// ===============================
 
 const port = process.env.PORT || 7000;
 
